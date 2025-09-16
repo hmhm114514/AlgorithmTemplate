@@ -254,8 +254,7 @@ void solve() {
     }  
     vector<int> dis(n + 1, INF);  
     vector<bool> vis(n + 1, false);  
-    vector<int> cnt(n + 1, 0);   //记录最短路经过的边数
-    int f = 1;  
+    vector<int> cnt(n + 1, 0);   //记录最短路经过的边数 
     auto spfa = [&]() {  
         dis[1] = 0;  
         vis[1] = true;
@@ -269,13 +268,13 @@ void solve() {
                     dis[v] = dis[u] + w;  
                     cnt[v] = cnt[u] + 1;  
                     if (cnt[v] >= n) {  
-                        f = 0;  
-                        return;  //到这个点的最短路距离已经>=n 有负环
+                        return false;  //到这个点的最短路距离已经>=n 有负环
                     }  
                     if (!vis[v]) q.push(v), vis[v] = true;  
                 }  
             }  
         }  
+        return true;
     };  
     spfa();  
     if (!f || dis[n] == INF) {  
@@ -318,9 +317,10 @@ O((n + m) logn)
 auto dijkstra = [&](int s = 1) {  
     auto cmp = [](const PII &a, const PII &b) {  
         return a.first > b.first;  
-    };  
+    };  //如果需要自定义排序
     priority_queue<PII, vector<PII>, decltype(cmp)> q(cmp);  
-  
+	fill(vis.begin(), vis.end(), 0);
+	fill(dis.begin(), dis.end(), 1e18);
     dis[s] = 0;  
     q.push({0, s});  
     while (!q.empty()) {  
@@ -339,6 +339,92 @@ auto dijkstra = [&](int s = 1) {
     }  
 };
 ```
+
+### Johnson
+全源最短路问题，可以有负权边
+O(n * m * logm)
+新建一个0号节点，连接所有节点权值为0，从0跑一遍bellman-ford，得到0到其他点的最短路hi，假设存在w(u, v)，将该边的权值设置为$w + h_u - h_v$
+从现在开始从每个点为起点跑n轮dijkstra
+[P5905 【模板】全源最短路（Johnson） - 洛谷](https://www.luogu.com.cn/problem/solution/P5905)
+```cpp
+void solve() {  
+    int n, m;  
+    cin >> n >> m;  
+    vector g(n + 1, vector<PII>());  
+    for (int i = 0; i < m; ++i) {  
+        int u, v, w;  
+        cin >> u >> v >> w;  
+        g[u].push_back({v, w});  
+    }  
+    for (int i = 1; i <= n; ++i) {  
+        g[0].push_back({i, 0});  
+    }  
+    vector<int> h(n + 1, 1e18);  //势能
+    vector<char> vis(n + 1, 0);  
+    vector<int> cnt(n + 1, 0);  
+    auto spfa = [&]() {  
+        h[0] = 0;  
+        vis[0] = 1;  
+        queue<int> q;  
+        q.push(0);  
+        while (!q.empty()) {  
+            int u = q.front();  
+            q.pop(), vis[u] = 0;  
+            for (auto &[v, w]: g[u]) {  
+                if (h[v] > h[u] + w) {  
+                    h[v] = h[u] + w;  
+                    cnt[v] = cnt[u] + 1;  
+                    if (cnt[v] > n) return false; //  因为加入了假设源点，所以判负环需要>n
+                    if (!vis[v]) q.push(v), vis[v] = 1;  
+                }  
+            }  
+        }  
+        return true;  
+    };  
+    if (!spfa()) {  
+        cout << -1;  
+        return;  
+    }  
+    for (int i = 1; i <= n; ++i) {  
+        for (auto &[v, w]: g[i]) {  
+            w = w + h[i] - h[v];  
+        }  
+    }  
+    vector<int> dis(n + 1, 1e18);  
+    auto dijkstra = [&](int s = 1) {  
+        priority_queue<PII, vector<PII>, greater<PII> > q;  
+        fill(dis.begin(), dis.end(), 1e18);  
+        fill(vis.begin(), vis.end(), 0);  
+        dis[s] = 0;  
+        q.push({0, s});  
+        while (!q.empty()) {  
+            int u = q.top().second;  
+            q.pop();  
+            if (vis[u]) continue;  
+            vis[u] = 1;  
+            for (auto ed: g[u]) {  
+                int v = ed.first, w = ed.second;  
+                if (dis[v] > dis[u] + w) {  
+                    dis[v] = dis[u] + w;  
+                    q.push({dis[v], v});  
+                }  
+            }  
+        }  
+    };  
+    // 后面的只是题目要求输出
+    for (int i = 1; i <= n; ++i) {  
+        int ans = 0;  
+        dijkstra(i);  
+        for (int j = 1; j <= n; ++j) {  
+            if (dis[j] == 1e18) dis[j] = 1e9;  
+            else dis[j] += h[j] - h[i];  //要注意还原原始权值
+            ans += j * dis[j];  
+        }  
+        cout << ans << '\n';  
+    }  
+}
+```
+
 # 数据结构
 
 ## 线段树
